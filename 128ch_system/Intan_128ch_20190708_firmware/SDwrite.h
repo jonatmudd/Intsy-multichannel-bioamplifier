@@ -2,14 +2,14 @@
 // Configuring SD card for writes
 // -----------------------------
 
-// ------Create sd card volume  and datafile to write to
-// 
-// ------Create sd card volume  and datafile to write to
-// SDFAT library circa apr 2024 requires updated SD types JE 05 Apr 2024
-SdFs sdEx;  //  JE changed from sdio to sdioEX 20 Nov 2018, fastest implementation, requires newer/fast SD card
-//SdFat sdEx;  //  JE changed from sdio to sdioEX 20 Nov 2018, fastest implementation, requires newer/fast SD card
-FsFile dataFile;   // data file instance
+// Use Teensy SDIO
+// JE: 09 June 2025: aded arg SD_CONFIG to expicitly config with Teensy SDIO
+#define SD_CONFIG  SdioConfig(FIFO_SDIO)
 
+// ------Create sd card volume  and datafile to write to
+SdFs sdEx;  //  JE changed from  sdioEX in 2019 version to SdFs for compatibility with newer SDFat library (native to Teensyduino)
+//SdFat sdEx;  //  JE changed from sdio to sdioEX 20 Nov 2018, fastest implementation, requires newer/fast SD card
+FsFile dataFile;   // update type to FsFile: JE 15 May 2025
 bool SDcardInitStatus = false;
 bool SDcardFileOpenStatus = false;
 

@@ -12,8 +12,9 @@ bool initSDcard() {
 
   bool SDcardInit_success = false;
   SERIALNAME->println("Iniatalize SD card...");
-  if (!sdEx.begin()) {
-    SERIALNAME->println("SdFatSdioEX begin() failed. Check SD card is present in microSD slot.");
+  if (!sdEx.begin(SD_CONFIG)) { // JE 09 June 2025: aded arg SD_CONFIG to expicitly config with Teensy SDIO
+    SERIALNAME->println("Sd begin() failed to initialize. Check SD card is present in microSD slot.");
+    //sdEx.initErrorHalt(&SERIALNAME); //JE 09 June 2025:  print more informative information if init fails
   }
   else { // SD memory card initiailzed; now open a file
     sdEx.chvol(); // make sdEx the current volume.
@@ -39,7 +40,7 @@ bool initSDcard() {
 bool SDcardCreateLogFile() { // added JE 2018 Nov 20, creating a contiguous, pre-erased file to minimize logging latency
 
 
-  bool SDcardOpenFile_success = false;
+  bool SDcardOpenFile_success = false; //initialize. flag will be set to true following successful preallocate
 
 
   // Set file name suffix.  Base file name is "Intsy_"
@@ -58,7 +59,8 @@ bool SDcardCreateLogFile() { // added JE 2018 Nov 20, creating a contiguous, pre
 
   for (int i = 0; i < 2; i++) {
     while (!SERIALNAME->available()) {
-      SysCall::yield();
+      // JE 15 may 2025: commenting out yield - not necessary anymore?
+     // SysCall::yield();
     }
     char c = SERIALNAME->read();
     //Serial.write(c);
@@ -110,7 +112,9 @@ bool SDcardCreateLogFile() { // added JE 2018 Nov 20, creating a contiguous, pre
 
   // wait for user to input desired sampling rate
   while (!SERIALNAME->available()) {
-    SysCall::yield();    // wait for user input
+    
+    // JE 15 May 2025: commenting out. yield() likely doesn't do anything useful here.
+    // SysCall::yield();    // wait for user input
   }
 
   uint32_t LogFileSz_MB = SERIALNAME->parseInt();
@@ -119,16 +123,30 @@ bool SDcardCreateLogFile() { // added JE 2018 Nov 20, creating a contiguous, pre
 
   //uint32_t log_file_size = 2ull * 1024 * 1024 * 1024;  // 2GB %should be determined by Nchans x Fs x Experiment Duration
 
-  SERIALNAME->print(F("File Size (MB) set to:)"));
+  SERIALNAME->print(F("File Size (MB) set to: "));
   SERIALNAME->println(log_file_size);
 
 
   serialFlush();
 
+// JE: added section 09 June 2025. use flags to open or create file . 
+// Using O_EXCL should throw error/open will fail if file requested already exists 
 
+  if (!dataFile.open(fname, O_WRITE | O_CREAT | O_EXCL)) {     
+    SERIALNAME->println("SD open failed. Quite possibly the filename requested already exists. \n \t No overwrites allowed for safety \n\t Try another file name\n");
+    return false;
+  }
 
+// File must be pre-allocated to avoid huge delays searching for free clusters.
+// JE 15 May 2025: Better(?)/updated preallocation method, copy+paste from SdFat example: TeensySdioLogger.ino
+  
+  if (!dataFile.preAllocate(log_file_size)) {
+     SERIALNAME->println("preAllocate failed\n");
+     dataFile.close();
+     return false;
+  }
 
-
+/*  JE 15 may 2025: BLock comment out old school way of preallocate and erase. 
   // probably just have user input log_file_size directly
   if (!dataFile.createContiguous(sdEx.vwd(), fname , log_file_size)) { //requires const char* input ie: "logJE001.bin"
     SERIALNAME->println("ContigFile: createContiguous() failed");
@@ -159,6 +177,7 @@ bool SDcardCreateLogFile() { // added JE 2018 Nov 20, creating a contiguous, pre
   //this->first_sector = first_sector;
   //this->last_sector = last_sector;
   next_sector = first_sector;
+*/
 
   dataFile.flush();
   
